@@ -1,0 +1,33 @@
+{
+    "name": "Youtube Watch Later Cleaner",
+    "version": "1.0",
+    "description": "A Chrome extension to scrape YouTube Watch Later playlists and save data in CSV format.",
+    "manifest_version": 3,
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "permissions": [
+      "storage",
+      "tabs"
+    ],
+    "content_scripts": [
+      {
+        "matches": ["https://*.youtube.com/*"],
+        "js": ["content_script.js"],
+        "run_at": "document_start"
+      }
+    ],
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "assets/save.png",
+          "assets/delete.png"
+        ],
+        "matches": ["https://*.youtube.com/*"]
+      }
+    ],
+    "options_page": "options.html"
+}
