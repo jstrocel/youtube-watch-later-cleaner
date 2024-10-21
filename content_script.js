@@ -5,7 +5,6 @@
   let total_videos;
   let videos_on_screen = 0;
   let load_playlist = false;
-  let load_playlist_finished = false;
   let all_videos_loaded = false;
   let currentUser = "";
   let currentPlaylist = "";
@@ -60,41 +59,26 @@
   }
 
   const savePlaylistEventHandler = async() =>{
-    console.log("You just clicked to save the playlist. Hope you know what you are doing!")
-    //#contents.style-scope.ytd-item-section-renderer,style-scope.ytd-item-section-renderer
+    loadPlaylistPromise().then(createPlayListCsv);
+  }
+
+  const createPlayListCsv = async() => {
     playlistItems = document.querySelectorAll('#contents .ytd-playlist-video-list-renderer ytd-playlist-video-renderer')
-    console.log(`This playlist is displaying ${playlistItems.length} items.`)
-    console.log(`Actual Playlist length is ${document.getElementsByClassName("metadata-stats")[0].children[1].innerText}`)
-    console.log(playlistItems);
+    
     var newPlaylistItems = [];
 
-    let rows = [['index', 'video name', 'video url', 'video channel url', 'video channel name']]
+    let rows = [['index', 'video name', 'video url', 'video channel url', 'video channel name', 'video length']]
     
-    for(i=0; i<playlistItems.length; i++){
+    for(i=0; i< playlistItems.length; i++){
       const index = playlistItems[i].querySelector('#index').textContent;
       const videoName = playlistItems[i].querySelector('#video-title').textContent.trim();
       const videoURL = "https://www.youtube.com" + playlistItems[i].querySelector('#video-title').getAttribute('href');
       const videoChannelURL = playlistItems[i].querySelector('#text > a').href;
       const videoChannelName = playlistItems[i].querySelector('#text > a').textContent.trim();
-      row = [index, `"${videoName.replaceAll('#', '%23')}"`, videoURL, videoChannelURL, `"${videoChannelName}"`]
+      const videoLength = playlistItems[i].querySelector('.badge-shape-wiz__text').innerText;
+      row = [index, `"${videoName.replaceAll('#', '%23')}"`, videoURL, videoChannelURL, `"${videoChannelName}"`, `"${videoLength}"`]
 
       rows.push(row)
-   
-  
-      console.log(`index: ${index}`);
-      console.log(`Video Name: ${videoName}`);
-      console.log(`Video URL: ${videoURL}`);
-      console.log(`Video Channel URL: ${videoChannelURL}`);
-      console.log(`Video Channel Name: ${videoChannelName}`);
-
-      const newPlaylistEntry = {
-        video_name: videoName,
-        video_channel_name:videoChannelName,
-        video_channel_url:videoChannelURL,
-        video_url: videoURL,
-        video_index: index,
-        play_list_id: currentPlaylist
-      }
     }
 
 
@@ -111,21 +95,37 @@
       document.body.appendChild(link); // Required for FF
 
       link.click(); // This will download the data file named "my_data.csv".
-      console.log(newPlaylistEntry);
-      console.log(getBytesLength(JSON.stringify(newPlaylistEntry)))
 
-      newPlaylistItems.push(newPlaylistEntry);
-    console.log(JSON.stringify(newPlaylistItems))
-    console.log(getBytesLength(JSON.stringify(newPlaylistItems)))
-    console.log(chrome.storage.sync.set({[currentUser]: JSON.stringify(newPlaylistItems)}));
   }
 
   const deletePlaylistEventHandler = async() =>{
    var answer = window.confirm("This will delete your entire Playlist. Are you sure?");
       if (answer) {
-        load_playlist = true;
-        loadVideos();
+        loadPlaylistPromise().then(deletePlayList);
       }
+  }
+
+
+  const deletePlayList = async() => {
+    setInterval(function () {
+      video = document.getElementsByTagName('ytd-playlist-video-renderer')[0];
+  
+      video.querySelector(`#primary button[aria-label="${window.ytcfg.msgs["VIDEO_ACTION_MENU"]}"]`).click();
+  
+      var things = document.evaluate(
+          `//span[contains(text(),"${document.querySelector('meta[name="title"]')?.content}")]`,
+          document,
+          null,
+          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+          null
+      );
+  
+      for (var i = 0; i < things.snapshotLength; i++) 
+      {
+          things.snapshotItem(i).click();
+      }
+  }, 400);
+
   }
 
   function getBytesLength(str) {
@@ -143,29 +143,46 @@ const observer = new MutationObserver((mutations) => {
       watchLaterPlaylistLoaded();
     }
     
-    if(load_playlist == true){
-      loadVideos();
-    }
   })
 })
 
-const loadVideos = async () => {
-  total_videos_string = document.getElementsByClassName("metadata-stats")[0]
-  total_videos = total_videos_string.innerText.replace(/[^0-9]/g, '').split(',').map(Number).pop();
-  videos_on_screen_new_total = document.getElementsByClassName("ytd-playlist-video-list-renderer").length
-  spinner = document.getElementById("spinner")
-  if (videos_on_screen < videos_on_screen_new_total){
 
-    const continuations = document.getElementById("continuations");
-    continuations.scrollIntoView({ behavior: "instant", block: "end" });
+function loadPlaylistPromise(){
+  return new Promise((resolve, reject) => {
+    console.log("Woah! This Promise code is running!")
+    let loadPlayListFinished = false; 
+    const observerConfig = {attributes: false,characterData: true,childList: true,subtree: true,}
+    const playlistObserver =  new MutationObserver((mutations) =>{
 
-    videos_on_screen = videos_on_screen_new_total
-   
-    if (spinner.checkVisibility() == false){
-      load_playlist = false;
-    };
-  } 
+      mutations.forEach((mutation) => {
+        if (loadPlayListFinished == false){
+            loadVideos();
+
+          spinner = document.getElementById("spinner")
+          playlistItems =  document.getElementsByClassName("ytd-playlist-video-list-renderer")
+          lastPlaylistItemTimeStamp = playlistItems[playlistItems.length-2].querySelector('.badge-shape-wiz__text')
+          if ((spinner.checkVisibility() == false) && (lastPlaylistItemTimeStamp != null )) {
+            loadPlayListFinished = true;
+            videos_on_screen = document.getElementsByClassName("ytd-playlist-video-list-renderer").length
+            resolve(`${videos_on_screen} videos loaded!`)
+          };
+        } else{
+          resolve("Finished loading playlist!")
+        }
+        
+      });
+    })
+    playlistObserver.observe(document, observerConfig);
+    loadVideos();
+  })
 }
+
+ const loadVideos = async () => { 
+  const continuations = document.getElementById("continuations");
+  continuations.scrollIntoView({ behavior: "instant", block: "end" });
+
+ }
+
 
 const fetchPlaylist = () => {
   return new Promise((resolve) => {
@@ -181,25 +198,4 @@ observer.observe(document, {
   childList: true,
   subtree: true,
 })
-
-
-// Search this DOM node for text to blur and blur the parent element if found.
-// function processNode(node) {
-//   if (node.childNodes.length > 0) {
-//       Array.from(node.childNodes).forEach(processNode)
-//   }
-//   if (node.nodeType === Node.TEXT_NODE && node.textContent !== null && node.textContent.trim().length > 0) {
-//       const parent = node.parentElement
-//       if (parent !== null && (parent.tagName === 'SCRIPT' || parent.style.filter === blurFilter)) {
-//           // Already blurred
-//           return
-//       }
-//       if (node.textContent.includes(textToBlur)) {
-//           blurElement(parent)
-//       }
-//   }
-// }
-
-
 })();
-//<ytd-menu-renderer force-icon-button tonal-override class="style-scope ytd-playlist-header-renderer" safe-area menu-active>
