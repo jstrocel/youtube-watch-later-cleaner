@@ -8,6 +8,7 @@
   let all_videos_loaded = false;
   let currentUser = "";
   let currentPlaylist = "";
+  let loadPlayListFinished = false; 
   console.log("Extension Loaded!")
 
   
@@ -27,18 +28,6 @@
       console.log(youtubePlaylistControls)
       youtubePlaylistControls.appendChild(saveBtn);
       saveBtn.addEventListener("click", savePlaylistEventHandler)
-
-      const targetText = 'ytInitialData';
-      const scriptElement = document.querySelectorAll('script')
-
-      for(i=0; i<scriptElement.length; i++){
-        if (scriptElement[i].innerText.includes("var ytInitialData = ")){
-          const jsonData = JSON.parse(scriptElement[i].innerText.replace(/var ytInitialData = /, '').replace(';',''));
-          currentUser = jsonData.header.playlistHeaderRenderer.playlistId.replace('/@','');
-          
-          currentPlaylist =jsonData.sidebar.playlistSidebarRenderer.items[1].playlistSidebarSecondaryInfoRenderer.videoOwner.videoOwnerRenderer.navigationEndpoint.commandMetadata.webCommandMetadata.url
-        }
-      }
   
     }
     if (!deletePlayListBtnExists) {
@@ -110,10 +99,10 @@
     setInterval(function () {
       video = document.getElementsByTagName('ytd-playlist-video-renderer')[0];
   
-      video.querySelector(`#primary button[aria-label="${window.ytcfg.msgs["VIDEO_ACTION_MENU"]}"]`).click();
+      video.querySelector('#primary button[aria-label="Action menu"]').click();
   
       var things = document.evaluate(
-          `//span[contains(text(),"${document.querySelector('meta[name="title"]')?.content}")]`,
+          '//span[contains(text(),"Remove from")]',
           document,
           null,
           XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
@@ -124,7 +113,7 @@
       {
           things.snapshotItem(i).click();
       }
-  }, 400);
+  }, 500);
 
   }
 
@@ -150,7 +139,7 @@ const observer = new MutationObserver((mutations) => {
 function loadPlaylistPromise(){
   return new Promise((resolve, reject) => {
     console.log("Woah! This Promise code is running!")
-    let loadPlayListFinished = false; 
+
     const observerConfig = {attributes: false,characterData: true,childList: true,subtree: true,}
     const playlistObserver =  new MutationObserver((mutations) =>{
 
@@ -169,11 +158,16 @@ function loadPlaylistPromise(){
         } else{
           resolve("Finished loading playlist!")
         }
-        
+         
       });
     })
-    playlistObserver.observe(document, observerConfig);
-    loadVideos();
+    if (loadPlayListFinished == false){
+      playlistObserver.observe(document, observerConfig);
+      loadVideos();
+    } else {
+      resolve("Finished loading playlist!")
+    }
+
   })
 }
 
