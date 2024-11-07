@@ -9,10 +9,6 @@
     "background": {
       "service_worker": "background.js"
     },
-    "permissions": [
-      "storage",
-      "tabs"
-    ],
     "content_scripts": [
       {
         "matches": ["https://*.youtube.com/*"],
